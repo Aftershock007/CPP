@@ -64,7 +64,13 @@ int main() {
     // const Vector<int> vector1({1,2,3,4,5});
     // const int arr1[5] = {1,2,3,4,5};
     // const Vector<int> vector1(5, arr1);
-    const Vector<int> vector1({1,2,3,4,5});
+    // const Vector<int> vector1({1,2,3,4,5});
+    std::size_t size;
+    std::cin >> size;
+    Vector<int> vector1(size);
+    for (std::size_t i = 0; i < size; ++i) {
+        std::cin >> vector1[i];
+    }
     std::cout << vector1 << std::endl;
 
     return 0;

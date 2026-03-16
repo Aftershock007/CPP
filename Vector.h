@@ -66,6 +66,9 @@ public:
 
     // I/O operator overloading
     template <typename U>
+    friend std::istream& operator>>(std::istream& in, Vector<U>& vector);
+
+    template <typename U>
     friend std::ostream& operator<<(std::ostream& out, const Vector<U>& vector);
 
     // Destructor
@@ -91,6 +94,32 @@ const U& Vector<U>::operator[](const std::size_t index) const {
         throw std::out_of_range("Index out of bounds");
     }
     return data_[index];
+}
+
+template <typename U>
+std::istream& operator>>(std::istream& in, Vector<U>& vector) {
+    std::size_t capacity = 8;
+    U* buffer = new U[capacity];
+    std::size_t count = 0;
+    for (U temp; in >> temp;) {
+        if (count == capacity) {
+            capacity *= 2;
+            U* new_buffer = new U[capacity];
+            std::copy(buffer, buffer + count, new_buffer);
+            delete[] buffer;
+            buffer = new_buffer;
+        }
+        buffer[count++] = temp;
+    }
+    delete[] vector.data_;
+    vector.data_ = nullptr;
+    vector.size_ = count;
+    if (count > 0) {
+        vector.data_ = new U[count];
+        std::copy(buffer, buffer + count, vector.data_);
+    }
+    delete[] buffer;
+    return in;
 }
 
 template <typename U>
