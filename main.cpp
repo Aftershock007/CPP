@@ -71,7 +71,9 @@ int main() {
     for (std::size_t i = 0; i < size; ++i) {
         std::cin >> vector1[i];
     }
-    std::cout << vector1 << std::endl;
+    Vector<int> vector2;
+    vector2 = vector1;
+    std::cout << vector2 << std::endl;
 
     return 0;
 }

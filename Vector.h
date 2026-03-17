@@ -13,7 +13,6 @@ private:
     std::size_t size_;
 
 public:
-    // Constructors
     Vector() : data_(nullptr), size_(0) {
         std::cout << "Default constructor called\n";
     }
@@ -22,8 +21,7 @@ public:
         if (size == 0) {
             data_ = nullptr;
             size_ = 0;
-        }
-        else {
+        } else {
             data_ = new T[size]();
             size_ = size;
         }
@@ -34,8 +32,7 @@ public:
         if (other.size() == 0) {
             data_ = nullptr;
             size_ = 0;
-        }
-        else {
+        } else {
             size_ = other.size();
             data_ = new T[size_];
             std::copy(other.begin(), other.end(), data_);
@@ -47,8 +44,7 @@ public:
         if (other == nullptr) {
             data_ = nullptr;
             size_ = 0;
-        }
-        else {
+        } else {
             size_ = size;
             data_ = new T[size];
             std::copy(other, other + size, data_);
@@ -56,22 +52,34 @@ public:
         std::cout << "Parameterized constructor 3 called\n";
     }
 
+    Vector(const Vector<T>& other) {
+        if (other.data_ == nullptr || other.size_ == 0) {
+            data_ = nullptr;
+            size_ = 0;
+        } else {
+            size_ = other.size_;
+            data_ = new T[other.size_];
+            std::copy(other.data_, other.data_ + other.size_, data_);
+        }
+        std::cout << "Copy constructor called\n";
+    }
+
     [[nodiscard]] std::size_t size() const {
         return size_;
     }
 
-    // Operator overloading
     T& operator[](std::size_t index);
+
     const T& operator[](std::size_t index) const;
 
-    // I/O operator overloading
+    Vector<T>& operator=(const Vector<T>& other);
+
     template <typename U>
     friend std::istream& operator>>(std::istream& in, Vector<U>& vector);
 
     template <typename U>
     friend std::ostream& operator<<(std::ostream& out, const Vector<U>& vector);
 
-    // Destructor
     ~Vector() {
         delete[] data_;
         data_ = nullptr;
@@ -94,6 +102,23 @@ const U& Vector<U>::operator[](const std::size_t index) const {
         throw std::out_of_range("Index out of bounds");
     }
     return data_[index];
+}
+
+template <typename U>
+Vector<U>& Vector<U>::operator=(const Vector& other) {
+    if (this != &other) {
+        delete[] data_;
+        if (other.data_ == nullptr || other.size_ == 0) {
+            data_ = nullptr;
+            size_ = 0;
+        } else {
+            size_ = other.size_;
+            data_ = new U[other.size_];
+            std::copy(other.data_, other.data_ + other.size_, data_);
+        }
+        std::cout << "Copy assignment called\n";
+    }
+    return *this;
 }
 
 template <typename U>

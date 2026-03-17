@@ -1,0 +1,146 @@
+Vector Class - Additional Implementations (CMU 15-445 Relevant)
+================================================================
+
+CURRENT STATE:
+- Default, parameterized constructors
+- operator[], operator<<, operator>>
+- Destructor
+- Missing: capacity management, copy/move semantics, iterators
+
+================================================================
+SECTION 1: RULE OF FIVE (Critical - fix undefined behavior first)
+================================================================
+
+1. Copy Constructor
+   Vector(const Vector& other)
+   - Deep copy the data_ array
+   - Why: Without this, copies share the same pointer -> double-free crash
+   - CMU Link: Buffer pool page copying, RAII ownership model
+
+2. Copy Assignment Operator
+   Vector& operator=(const Vector& other)
+   - Handle self-assignment (if this == &other, return *this)
+   - Delete old data_, allocate new, copy
+   - Why: Same as above, triggered on assignment not construction
+   - CMU Link: Frame management, page replacement writes
+
+3. Move Constructor
+   Vector(Vector&& other) noexcept
+   - Steal other.data_, set other.data_ = nullptr, other.size_ = 0
+   - Why: Zero-copy ownership transfer, no heap allocation
+   - CMU Link: Buffer pool moving pages between frames efficiently
+
+4. Move Assignment Operator
+   Vector& operator=(Vector&& other) noexcept
+   - Delete current data_, steal from other, null out other
+   - Why: Avoids deep copy when returning Vector from functions
+   - CMU Link: Same as move constructor, used in STL containers internally
+
+================================================================
+SECTION 2: CAPACITY MODEL (Core DB concept)
+================================================================
+
+5. Add capacity_ field
+   T* data_;
+   size_t size_;      // elements currently stored
+   size_t capacity_;  // elements allocated (capacity >= size always)
+   - Why: Avoid reallocating on every push_back
+   - CMU Link: Buffer pool pre-allocates frames; pages vs slots distinction
+
+6. push_back(const T& val) and push_back(T&& val)
+   - If size_ == capacity_, double the capacity (growth factor = 2)
+   - Allocate new buffer, move old elements, delete old buffer
+   - Why: Amortized O(1) insertion
+   - CMU Link: Extendible hashing bucket growth, page overflow chains
+
+7. reserve(size_t n)
+   - If n > capacity_, reallocate to capacity n without changing size_
+   - Why: Pre-allocate to avoid repeated reallocs
+   - CMU Link: Buffer pool pre-allocating N frames at startup
+
+8. resize(size_t n)
+   - If n > size_, grow and value-initialize new elements
+   - If n < size_, shrink (do not reallocate, just reduce size_)
+   - CMU Link: Resizing hash table buckets during split/merge
+
+================================================================
+SECTION 3: ITERATOR SUPPORT
+================================================================
+
+9. begin() / end()
+   T* begin() { return data_; }
+   T* end()   { return data_ + size_; }
+   - Enables range-for: for (auto& x : vec)
+   - Why: Required for STL algorithms (sort, find, copy)
+   - CMU Link: B+ tree leaf page traversal, sequential scan operator
+
+10. cbegin() / cend() (const versions)
+    const T* cbegin() const { return data_; }
+    const T* cend()   const { return data_ + size_; }
+    - Read-only iteration
+    - CMU Link: Read-only sequential scans in query execution engine
+
+================================================================
+SECTION 4: COMPARISON & UTILITIES
+================================================================
+
+11. operator== and operator!=
+    bool operator==(const Vector& other) const
+    bool operator!=(const Vector& other) const
+    - Compare size first, then element-by-element
+    - CMU Link: Tuple/record comparison in sort and join operators
+
+12. at(size_t index)
+    T& at(size_t index)          // throws std::out_of_range
+    const T& at(size_t index) const
+    - Bounds-checked access (vs operator[] which is unchecked after you add capacity)
+    - CMU Link: CMU distinguishes safe vs unsafe page slot access
+
+13. empty()
+    bool empty() const { return size_ == 0; }
+    - CMU Link: Check before triggering a disk read / scan
+
+14. clear()
+    void clear()
+    - Set size_ = 0, do NOT deallocate (capacity stays)
+    - CMU Link: Resetting a buffer frame without freeing memory
+
+15. data()
+    T* data() { return data_; }
+    const T* data() const { return data_; }
+    - Raw pointer access
+    - CMU Link: Directly mirrors Page::GetData() in CMU's buffer pool manager
+
+================================================================
+RECOMMENDED IMPLEMENTATION ORDER
+================================================================
+
+Priority 1 (Do first - fixes undefined behavior):
+  -> Copy Constructor (#1)
+  -> Copy Assignment (#2)
+  -> Move Constructor (#3)
+  -> Move Assignment (#4)
+
+Priority 2 (Core DB concept - capacity model):
+  -> Add capacity_ field (#5)
+  -> push_back (#6)
+  -> reserve (#7)
+  -> resize (#8)
+
+Priority 3 (Enable algorithms):
+  -> begin/end iterators (#9, #10)
+
+Priority 4 (Completeness):
+  -> operator==, operator!= (#11)
+  -> at() (#12)
+  -> empty(), clear(), data() (#13, #14, #15)
+
+================================================================
+CMU 15-445 CONCEPTS THIS COVERS
+================================================================
+- RAII and ownership (Rule of Five)
+- Buffer Pool Manager (capacity vs size, reserve, clear, data())
+- Extendible Hashing (dynamic growth in push_back)
+- B+ Tree (iterator traversal)
+- Query Execution (comparison operators, sequential scan via iterators)
+- Tuple storage (at(), operator[], data())
