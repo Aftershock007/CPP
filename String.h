@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <stdexcept>
 #include <iostream>
+#include <iomanip>
 #include <cstddef>
 
 class String {
@@ -42,9 +43,17 @@ public:
         std::cout << "Move constructor called\n";
     }
 
-    String& operator=(const String& other);
+    void swap(String& other) noexcept {
+        std::swap(data_, other.data_);
+        std::swap(size_, other.size_);
+    }
 
-    String& operator=(String&& other) noexcept;
+    // CAS: pass by value handles both copy and move assignment
+    String& operator=(String other) noexcept;
+
+    // String& operator=(const String& other);
+    //
+    // String& operator=(String&& other) noexcept;
 
     [[nodiscard]] std::size_t size() const {
         return size_;
@@ -72,30 +81,36 @@ public:
     }
 };
 
-inline String& String::operator=(const String& other) {
-    if (this == &other) {
-        return *this;
-    }
-    char* new_data = new char[other.size_ + 1];
-    std::memcpy(new_data, other.data_, other.size_ + 1);
-    delete[] data_;
-    data_ = new_data;
-    size_ = other.size_;
-    std::cout << "Assignment called\n";
+// CAS: parameter is already a copy (or moved-into), just swap
+inline String& String::operator=(String other) noexcept {
+    other.swap(*this);
     return *this;
 }
 
-inline String& String::operator=(String&& other) noexcept {
-    if (this != &other) {
-        delete[] data_;
-        data_ = other.data_;
-        size_ = other.size_;
-        other.data_ = new char[1]{'\0'};
-        other.size_ = 0;
-        std::cout << "Move assignment called\n";
-    }
-    return *this;
-}
+// inline String& String::operator=(const String& other) {
+//     if (this == &other) {
+//         return *this;
+//     }
+//     char* new_data = new char[other.size_ + 1];
+//     std::memcpy(new_data, other.data_, other.size_ + 1);
+//     delete[] data_;
+//     data_ = new_data;
+//     size_ = other.size_;
+//     std::cout << "Assignment called\n";
+//     return *this;
+// }
+//
+// inline String& String::operator=(String&& other) noexcept {
+//     if (this != &other) {
+//         delete[] data_;
+//         data_ = other.data_;
+//         size_ = other.size_;
+//         other.data_ = new char[1]{'\0'};
+//         other.size_ = 0;
+//         std::cout << "Move assignment called\n";
+//     }
+//     return *this;
+// }
 
 inline std::ostream& operator<<(std::ostream& out, const String& obj) {
     out << obj.data_;
@@ -104,7 +119,7 @@ inline std::ostream& operator<<(std::ostream& out, const String& obj) {
 
 inline std::istream& operator>>(std::istream& in, String& obj) {
     char buffer[4096];
-    if (in >> buffer) {
+    if (in >> std::setw(4096) >> buffer) {
         const std::size_t new_size = std::strlen(buffer);
         char* new_data = new char[new_size + 1];
         std::memcpy(new_data, buffer, new_size + 1);
