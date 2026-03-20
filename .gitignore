@@ -1,0 +1,21 @@
+# Build
+cmake-build-*/
+build/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*~
+
+# Compiled
+*.o
+*.out
+*.exe
+
+# OS
+.DS_Store
+Thumbs.db
+
+#TODO
+Vector_TODO.txt
