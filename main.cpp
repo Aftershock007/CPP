@@ -1,13 +1,12 @@
 #include <iostream>
-#include <ranges>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 #include <algorithm>
 #include <functional>
 #include <unordered_set>
-#include "String.h"
-#include "Vector.h"
+#include "String-v17.h"
+#include "Vector-v17.h"
 
 void test_string() {
     std::cout << "========== STRING TESTS ==========\n\n";
@@ -393,10 +392,10 @@ void test_vector() {
     }
     std::cout << "After doubling: " << iter_vec << "\n";
 
-    std::ranges::sort(iter_vec, std::greater<>());
+    std::sort(iter_vec.begin(), iter_vec.end(), std::greater<>());
     std::cout << "Sorted descending: " << iter_vec << "\n";
 
-    auto it = std::ranges::find(iter_vec, 60);
+    auto it = std::find(iter_vec.begin(), iter_vec.end(), 60);
     std::cout << "find(60): " << (it != iter_vec.end() ? "found" : "not found") << "\n";
 
     const Vector<int> const_iter_vec({1, 2, 3});
@@ -408,15 +407,15 @@ void test_vector() {
 
     Vector<int> rev_vec({1, 2, 3, 4, 5});
     std::cout << "Reverse: ";
-    for (int& rit : std::ranges::reverse_view(rev_vec)) {
-        std::cout << rit << " ";
+    for (auto rit = rev_vec.rbegin(); rit != rev_vec.rend(); ++rit) {
+        std::cout << *rit << " ";
     }
     std::cout << "\n";
 
     const Vector<int> const_rev_vec({10, 20, 30});
     std::cout << "Const reverse: ";
-    for (int rit : std::ranges::reverse_view(const_rev_vec)) {
-        std::cout << rit << " ";
+    for (auto rit = const_rev_vec.rbegin(); rit != const_rev_vec.rend(); ++rit) {
+        std::cout << *rit << " ";
     }
     std::cout << "\n\n";
 

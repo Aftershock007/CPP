@@ -1,5 +1,5 @@
-#ifndef CPP_VECTOR_H
-#define CPP_VECTOR_H
+#ifndef CPP_VECTOR_V26_H
+#define CPP_VECTOR_V26_H
 
 #include <iostream>
 #include <stdexcept>
@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <utility>
 #include <iterator>
+#include <concepts>
 
 template <typename T>
 class Vector {
@@ -16,9 +17,9 @@ private:
     std::size_t capacity_;
 
 public:
-    Vector() : data_(nullptr), size_(0), capacity_(0) {}
+    constexpr Vector() : data_(nullptr), size_(0), capacity_(0) {}
 
-    explicit Vector(const std::size_t size) {
+    constexpr explicit Vector(const std::size_t size) {
         if (size == 0) {
             data_ = nullptr;
             size_ = 0;
@@ -30,7 +31,7 @@ public:
         }
     }
 
-    explicit Vector(std::initializer_list<T> other) {
+    constexpr explicit Vector(std::initializer_list<T> other) {
         if (other.size() == 0) {
             data_ = nullptr;
             size_ = 0;
@@ -43,7 +44,7 @@ public:
         }
     }
 
-    explicit Vector(const std::size_t size, const T* other) {
+    constexpr explicit Vector(const std::size_t size, const T* other) {
         if (other == nullptr || size == 0) {
             data_ = nullptr;
             size_ = 0;
@@ -56,7 +57,7 @@ public:
         }
     }
 
-    Vector(const Vector& other) {
+    constexpr Vector(const Vector& other) {
         if (other.data_ == nullptr || other.size_ == 0) {
             data_ = nullptr;
             size_ = 0;
@@ -69,106 +70,107 @@ public:
         }
     }
 
-    Vector(Vector&& other) noexcept : data_(other.data_), size_(other.size_), capacity_(other.capacity_) {
+    constexpr Vector(Vector&& other) noexcept : data_(other.data_), size_(other.size_), capacity_(other.capacity_) {
         other.data_ = nullptr;
         other.size_ = 0;
         other.capacity_ = 0;
     }
 
-    [[nodiscard]] std::size_t size() const {
+    [[nodiscard]] constexpr std::size_t size() const noexcept {
         return size_;
     }
 
-    [[nodiscard]] std::size_t capacity() const {
+    [[nodiscard]] constexpr std::size_t capacity() const noexcept {
         return capacity_;
     }
 
-    void reserve(std::size_t new_cap);
+    constexpr void reserve(std::size_t new_cap);
 
-    void push_back(const T& val);
+    constexpr void push_back(const T& val);
 
-    void push_back(T&& val);
+    constexpr void push_back(T&& val);
 
     template <typename... Args>
-    T& emplace_back(Args&&... args);
+        requires std::constructible_from<T, Args...>
+    constexpr T& emplace_back(Args&&... args);
 
-    void pop_back();
+    constexpr void pop_back();
 
-    void resize(std::size_t count);
+    constexpr void resize(std::size_t count);
 
-    void resize(std::size_t count, const T& val);
+    constexpr void resize(std::size_t count, const T& val);
 
-    void assign(std::size_t count, const T& val);
+    constexpr void assign(std::size_t count, const T& val);
 
-    T* insert(const T* pos, const T& val);
+    constexpr T* insert(const T* pos, const T& val);
 
-    T* erase(const T* pos);
+    constexpr T* erase(const T* pos);
 
-    void shrink_to_fit();
+    constexpr void shrink_to_fit();
 
-    T& operator[](std::size_t index);
+    // Deducing this (C++23) — single overload handles const and non-const access
+    constexpr auto&& operator[](this auto&& self, std::size_t index) {
+        if (index >= self.size_) {
+            throw std::out_of_range("Index out of bounds");
+        }
+        return std::forward_like<decltype(self)>(self.data_[index]);
+    }
 
-    const T& operator[](std::size_t index) const;
-
-    T* begin() {
+    constexpr T* begin() noexcept {
         return data_;
     }
 
-    T* end() {
+    constexpr T* end() noexcept {
         return data_ + size_;
     }
 
-    const T* begin() const {
+    constexpr const T* begin() const noexcept {
         return data_;
     }
 
-    const T* end() const {
+    constexpr const T* end() const noexcept {
         return data_ + size_;
     }
 
-    std::reverse_iterator<T*> rbegin() {
+    constexpr std::reverse_iterator<T*> rbegin() noexcept {
         return std::reverse_iterator<T*>(end());
     }
 
-    std::reverse_iterator<T*> rend() {
+    constexpr std::reverse_iterator<T*> rend() noexcept {
         return std::reverse_iterator<T*>(begin());
     }
 
-    std::reverse_iterator<const T*> rbegin() const {
+    constexpr std::reverse_iterator<const T*> rbegin() const noexcept {
         return std::reverse_iterator<const T*>(end());
     }
 
-    std::reverse_iterator<const T*> rend() const {
+    constexpr std::reverse_iterator<const T*> rend() const noexcept {
         return std::reverse_iterator<const T*>(begin());
     }
 
-    [[nodiscard]] bool empty() const {
+    [[nodiscard]] constexpr bool empty() const noexcept {
         return size_ == 0;
     }
 
-    void clear() {
+    constexpr void clear() {
         size_ = 0;
     }
 
-    T* data() {
+    constexpr T* data() noexcept {
         return data_;
     }
 
-    const T* data() const {
+    constexpr const T* data() const noexcept {
         return data_;
     }
 
-    void swap(Vector& other) noexcept {
+    constexpr void swap(Vector& other) noexcept {
         std::swap(data_, other.data_);
         std::swap(size_, other.size_);
         std::swap(capacity_, other.capacity_);
     }
 
-    Vector& operator=(Vector other) noexcept;
-
-    // Vector& operator=(const Vector& other);
-
-    // Vector& operator=(Vector&& other) noexcept;
+    constexpr Vector& operator=(Vector other) noexcept;
 
     template <typename U>
     friend std::istream& operator>>(std::istream& in, Vector<U>& vector);
@@ -176,45 +178,31 @@ public:
     template <typename U>
     friend std::ostream& operator<<(std::ostream& out, const Vector<U>& vector);
 
-    ~Vector() {
+    constexpr ~Vector() {
         delete[] data_;
     }
 };
 
-template <typename U>
-U& Vector<U>::operator[](const std::size_t index) {
-    if (index >= size_) {
-        throw std::out_of_range("Index out of bounds");
-    }
-    return data_[index];
-}
-
-template <typename U>
-const U& Vector<U>::operator[](const std::size_t index) const {
-    if (index >= size_) {
-        throw std::out_of_range("Index out of bounds");
-    }
-    return data_[index];
-}
-
 // Strong exception guarantee: if copy throws, 'other' was never created.
 // Nothrow: swap itself is noexcept.
 template <typename U>
-Vector<U>& Vector<U>::operator=(Vector other) noexcept {
+constexpr Vector<U>& Vector<U>::operator=(Vector other) noexcept {
     other.swap(*this);
     return *this;
 }
 
 // Strong exception guarantee: if new throws, state is unchanged.
-// Uses std::move for O(n) pointer swaps instead of O(n) deep copies.
+// Uses std::move_if_noexcept for strong exception guarantee when relocating elements.
 template <typename U>
-void Vector<U>::reserve(const std::size_t new_cap) {
+constexpr void Vector<U>::reserve(const std::size_t new_cap) {
     if (new_cap <= capacity_) {
         return;
     }
     U* new_data = new U[new_cap];
     if (data_ != nullptr) {
-        std::move(data_, data_ + size_, new_data);
+        for (std::size_t i = 0; i < size_; ++i) {
+            new_data[i] = std::move_if_noexcept(data_[i]);
+        }
     }
     delete[] data_;
     data_ = new_data;
@@ -224,7 +212,7 @@ void Vector<U>::reserve(const std::size_t new_cap) {
 // Strong exception guarantee: if reserve throws, state is unchanged.
 // Copies val before reserve to handle self-reference (e.g. vec.push_back(vec[0])).
 template <typename U>
-void Vector<U>::push_back(const U& val) {
+constexpr void Vector<U>::push_back(const U& val) {
     if (size_ == capacity_) {
         U copy = val;
         reserve(capacity_ == 0 ? 1 : capacity_ * 2);
@@ -236,7 +224,7 @@ void Vector<U>::push_back(const U& val) {
 
 // Strong exception guarantee. No self-reference risk with rvalues.
 template <typename U>
-void Vector<U>::push_back(U&& val) {
+constexpr void Vector<U>::push_back(U&& val) {
     if (size_ == capacity_) {
         reserve(capacity_ == 0 ? 1 : capacity_ * 2);
     }
@@ -246,7 +234,8 @@ void Vector<U>::push_back(U&& val) {
 // Strong exception guarantee.
 template <typename U>
 template <typename... Args>
-U& Vector<U>::emplace_back(Args&&... args) {
+    requires std::constructible_from<U, Args...>
+constexpr U& Vector<U>::emplace_back(Args&&... args) {
     if (size_ == capacity_) {
         reserve(capacity_ == 0 ? 1 : capacity_ * 2);
     }
@@ -256,7 +245,7 @@ U& Vector<U>::emplace_back(Args&&... args) {
 
 // Nothrow guarantee.
 template <typename U>
-void Vector<U>::pop_back() {
+constexpr void Vector<U>::pop_back() {
     if (size_ > 0) {
         --size_;
         data_[size_] = U();
@@ -264,7 +253,7 @@ void Vector<U>::pop_back() {
 }
 
 template <typename U>
-void Vector<U>::resize(const std::size_t count) {
+constexpr void Vector<U>::resize(const std::size_t count) {
     if (count > capacity_) {
         reserve(count);
     }
@@ -276,7 +265,7 @@ void Vector<U>::resize(const std::size_t count) {
 }
 
 template <typename U>
-void Vector<U>::resize(const std::size_t count, const U& val) {
+constexpr void Vector<U>::resize(const std::size_t count, const U& val) {
     if (count > capacity_) {
         reserve(count);
     }
@@ -289,7 +278,7 @@ void Vector<U>::resize(const std::size_t count, const U& val) {
 
 // Strong exception guarantee: allocate before delete.
 template <typename U>
-void Vector<U>::assign(const std::size_t count, const U& val) {
+constexpr void Vector<U>::assign(const std::size_t count, const U& val) {
     if (count > capacity_) {
         U* new_data = new U[count];
         delete[] data_;
@@ -304,7 +293,7 @@ void Vector<U>::assign(const std::size_t count, const U& val) {
 
 // Basic exception guarantee. Invalidates iterators if reallocation occurs.
 template <typename U>
-U* Vector<U>::insert(const U* pos, const U& val) {
+constexpr U* Vector<U>::insert(const U* pos, const U& val) {
     const std::size_t index = pos - data_;
     if (index > size_) {
         throw std::out_of_range("Insert position out of bounds");
@@ -323,7 +312,7 @@ U* Vector<U>::insert(const U* pos, const U& val) {
 
 // Basic exception guarantee. Invalidates iterators at and after pos.
 template <typename U>
-U* Vector<U>::erase(const U* pos) {
+constexpr U* Vector<U>::erase(const U* pos) {
     const std::size_t index = pos - data_;
     if (index >= size_) {
         throw std::out_of_range("Erase position out of bounds");
@@ -339,7 +328,7 @@ U* Vector<U>::erase(const U* pos) {
 
 // Strong exception guarantee: if new throws, state is unchanged.
 template <typename U>
-void Vector<U>::shrink_to_fit() {
+constexpr void Vector<U>::shrink_to_fit() {
     if (capacity_ == size_) {
         return;
     }
@@ -356,63 +345,12 @@ void Vector<U>::shrink_to_fit() {
     capacity_ = size_;
 }
 
-// template <typename U>
-// Vector<U>& Vector<U>::operator=(const Vector& other) {
-//     if (this != &other) {
-//         if (other.data_ == nullptr || other.size_ == 0) {
-//             delete[] data_;
-//             data_ = nullptr;
-//             size_ = 0;
-//             capacity_ = 0;
-//         } else {
-//             U* new_data = new U[other.size_];
-//             std::copy(other.data_, other.data_ + other.size_, new_data);
-//             delete[] data_;
-//             data_ = new_data;
-//             size_ = other.size_;
-//             capacity_ = size_;
-//         }
-//     }
-//     return *this;
-// }
-//
-// template <typename U>
-// Vector<U>& Vector<U>::operator=(Vector&& other) noexcept {
-//     if (this != &other) {
-//         delete[] data_;
-//         data_ = other.data_;
-//         size_ = other.size_;
-//         capacity_ = size_;
-//         other.data_ = nullptr;
-//         other.size_ = 0;
-//     }
-//     return *this;
-// }
-
 template <typename U>
 std::istream& operator>>(std::istream& in, Vector<U>& vector) {
-    std::size_t capacity = 8;
-    U* buffer = new U[capacity];
-    std::size_t count = 0;
+    vector.clear();
     for (U temp; in >> temp;) {
-        if (count == capacity) {
-            capacity *= 2;
-            U* new_buffer = new U[capacity];
-            std::copy(buffer, buffer + count, new_buffer);
-            delete[] buffer;
-            buffer = new_buffer;
-        }
-        buffer[count++] = temp;
+        vector.push_back(std::move(temp));
     }
-    delete[] vector.data_;
-    vector.data_ = nullptr;
-    vector.size_ = count;
-    vector.capacity_ = count;
-    if (count > 0) {
-        vector.data_ = new U[count];
-        std::copy(buffer, buffer + count, vector.data_);
-    }
-    delete[] buffer;
     return in;
 }
 
@@ -427,4 +365,4 @@ std::ostream& operator<<(std::ostream& out, const Vector<U>& vector) {
     return out;
 }
 
-#endif //CPP_VECTOR_H
+#endif //CPP_VECTOR_V26_H

@@ -1,5 +1,5 @@
-#ifndef CPP_STRING_H
-#define CPP_STRING_H
+#ifndef CPP_STRING_V26_H
+#define CPP_STRING_V26_H
 
 #include <cstring>
 #include <algorithm>
@@ -8,6 +8,8 @@
 #include <cstddef>
 #include <cctype>
 #include <functional>
+#include <compare>
+#include <string_view>
 
 class String {
     // SSO: strings <= SSO_CAP bytes are stored inline, zero heap allocations.
@@ -19,10 +21,10 @@ class String {
     std::size_t size_;
     std::size_t capacity_;
 
-    [[nodiscard]] bool is_heap() const { return data_ != sso_buf_; }
+    [[nodiscard]] constexpr bool is_heap() const noexcept { return data_ != sso_buf_; }
 
     // Grow to at least new_cap. Moves data to heap if needed.
-    void grow(std::size_t new_cap) {
+    constexpr void grow(std::size_t new_cap) {
         if (new_cap <= capacity_) return;
         char* new_data = new char[new_cap + 1];
         std::memcpy(new_data, data_, size_ + 1);
@@ -36,12 +38,12 @@ public:
 
     // --- Constructors ---
 
-    String() : size_(0), capacity_(SSO_CAP) {
+    constexpr String() : size_(0), capacity_(SSO_CAP) {
         data_ = sso_buf_;
         sso_buf_[0] = '\0';
     }
 
-    explicit String(const char* cstr) {
+    constexpr explicit String(const char* cstr) {
         if (cstr == nullptr) {
             data_ = sso_buf_;
             size_ = 0;
@@ -60,8 +62,21 @@ public:
         }
     }
 
+    // Construct from std::string_view — zero-copy into SSO or heap.
+    constexpr explicit String(std::string_view sv) : size_(sv.size()) {
+        if (size_ <= SSO_CAP) {
+            data_ = sso_buf_;
+            capacity_ = SSO_CAP;
+        } else {
+            capacity_ = size_;
+            data_ = new char[capacity_ + 1];
+        }
+        std::copy(sv.begin(), sv.end(), data_);
+        data_[size_] = '\0';
+    }
+
     // Strong exception guarantee.
-    String(const String& other) : size_(other.size_) {
+    constexpr String(const String& other) : size_(other.size_) {
         if (size_ <= SSO_CAP) {
             data_ = sso_buf_;
             capacity_ = SSO_CAP;
@@ -73,7 +88,7 @@ public:
     }
 
     // Nothrow guarantee. No allocation — steals heap pointer or copies SSO bytes.
-    String(String&& other) noexcept : size_(other.size_), capacity_(other.capacity_) {
+    constexpr String(String&& other) noexcept : size_(other.size_), capacity_(other.capacity_) {
         if (other.is_heap()) {
             data_ = other.data_;
         } else {
@@ -88,15 +103,13 @@ public:
 
     // --- Assignment (CAS) ---
 
-    void swap(String& other) noexcept {
+    constexpr void swap(String& other) noexcept {
         const bool this_heap = is_heap();
         const bool other_heap = other.is_heap();
 
         if (this_heap && other_heap) {
-            // Both heap: just swap pointers
             std::swap(data_, other.data_);
         } else if (!this_heap && !other_heap) {
-            // Both SSO: swap buffer contents
             char temp[SSO_CAP + 1];
             std::memcpy(temp, sso_buf_, SSO_CAP + 1);
             std::memcpy(sso_buf_, other.sso_buf_, SSO_CAP + 1);
@@ -104,16 +117,13 @@ public:
             data_ = sso_buf_;
             other.data_ = other.sso_buf_;
         } else {
-            // One heap, one SSO
             String& h = this_heap ? *this : other;
             String& s = this_heap ? other : *this;
             char* heap_ptr = h.data_;
             std::size_t heap_cap = h.capacity_;
-            // Copy SSO bytes into heap string's sso_buf
             std::memcpy(h.sso_buf_, s.sso_buf_, SSO_CAP + 1);
             h.data_ = h.sso_buf_;
             h.capacity_ = SSO_CAP;
-            // Give heap pointer to the SSO string
             s.data_ = heap_ptr;
             s.capacity_ = heap_cap;
         }
@@ -121,55 +131,68 @@ public:
     }
 
     // Strong exception guarantee via CAS.
-    String& operator=(String other) noexcept {
+    constexpr String& operator=(String other) noexcept {
         other.swap(*this);
         return *this;
     }
 
     // --- Getters ---
 
-    [[nodiscard]] std::size_t size() const { return size_; }
-    [[nodiscard]] std::size_t capacity() const { return capacity_; }
-    [[nodiscard]] bool empty() const { return size_ == 0; }
-    [[nodiscard]] const char* c_str() const { return data_; }
+    [[nodiscard]] constexpr std::size_t size() const noexcept { return size_; }
+    [[nodiscard]] constexpr std::size_t capacity() const noexcept { return capacity_; }
+    [[nodiscard]] constexpr bool empty() const noexcept { return size_ == 0; }
+    [[nodiscard]] constexpr const char* c_str() const noexcept { return data_; }
+
+    // --- Implicit conversion to std::string_view (zero-copy) ---
+
+    constexpr operator std::string_view() const noexcept { return {data_, size_}; }
 
     // --- Iterators ---
 
-    char* begin() { return data_; }
-    char* end() { return data_ + size_; }
-    const char* begin() const { return data_; }
-    const char* end() const { return data_ + size_; }
+    constexpr char* begin() noexcept { return data_; }
+    constexpr char* end() noexcept { return data_ + size_; }
+    constexpr const char* begin() const noexcept { return data_; }
+    constexpr const char* end() const noexcept { return data_ + size_; }
 
-    // --- Element access ---
+    // --- Element access (deducing this, C++23) ---
 
-    char& operator[](std::size_t index);
-    const char& operator[](std::size_t index) const;
+    constexpr auto&& operator[](this auto&& self, std::size_t index) {
+        if (index >= self.size_) throw std::out_of_range("Index out of bounds");
+        return std::forward_like<decltype(self)>(self.data_[index]);
+    }
 
     // --- Modifiers ---
 
-    void clear() {
+    constexpr void clear() {
         size_ = 0;
         data_[0] = '\0';
     }
 
-    void reserve(std::size_t new_cap);
+    constexpr void reserve(std::size_t new_cap);
 
-    String& append(const String& other);
-    String& append(const char* cstr);
-    String& operator+=(const String& other);
-    String& operator+=(const char* cstr);
+    constexpr String& append(const String& other);
+    constexpr String& append(const char* cstr);
+    constexpr String& operator+=(const String& other);
+    constexpr String& operator+=(const char* cstr);
 
     // --- Operations ---
 
-    String substr(std::size_t pos, std::size_t len = npos) const;
-    [[nodiscard]] std::size_t find(char ch, std::size_t pos = 0) const;
-    [[nodiscard]] std::size_t find(const String& str, std::size_t pos = 0) const;
+    constexpr String substr(std::size_t pos, std::size_t len = npos) const;
+    [[nodiscard]] constexpr std::size_t find(char ch, std::size_t pos = 0) const;
+    [[nodiscard]] constexpr std::size_t find(const String& str, std::size_t pos = 0) const;
 
-    // --- Comparison (uses strcmp instead of manual loops) ---
+    // --- Comparison (spaceship operator, C++20) ---
 
-    bool operator==(const String& other) const;
-    bool operator>(const String& other) const;
-    bool operator<(const String& other) const;
+    constexpr std::strong_ordering operator<=>(const String& other) const {
+        return std::lexicographical_compare_three_way(
+            data_, data_ + size_, other.data_, other.data_ + other.size_);
+    }
+
+    // Kept separate from <=> for short-circuit on size mismatch.
+    constexpr bool operator==(const String& other) const {
+        if (size_ != other.size_) return false;
+        return std::equal(data_, data_ + size_, other.data_);
+    }
 
     // --- Stream I/O ---
 
@@ -178,14 +201,14 @@ public:
 
     // --- Destructor ---
 
-    ~String() {
+    constexpr ~String() {
         if (is_heap()) delete[] data_;
     }
 };
 
 // --- Non-member operator+ ---
 
-inline String operator+(const String& lhs, const String& rhs) {
+constexpr String operator+(const String& lhs, const String& rhs) {
     String result(lhs);
     result += rhs;
     return result;
@@ -193,13 +216,13 @@ inline String operator+(const String& lhs, const String& rhs) {
 
 // --- Inline definitions ---
 
-inline void String::reserve(const std::size_t new_cap) {
+constexpr void String::reserve(const std::size_t new_cap) {
     if (new_cap <= capacity_) return;
     grow(new_cap);
 }
 
 // Strong exception guarantee.
-inline String& String::append(const String& other) {
+constexpr String& String::append(const String& other) {
     if (other.size_ == 0) return *this;
     const std::size_t new_size = size_ + other.size_;
     if (new_size > capacity_) {
@@ -211,7 +234,7 @@ inline String& String::append(const String& other) {
     return *this;
 }
 
-inline String& String::append(const char* cstr) {
+constexpr String& String::append(const char* cstr) {
     if (cstr == nullptr) return *this;
     const std::size_t len = std::strlen(cstr);
     if (len == 0) return *this;
@@ -225,15 +248,15 @@ inline String& String::append(const char* cstr) {
     return *this;
 }
 
-inline String& String::operator+=(const String& other) {
+constexpr String& String::operator+=(const String& other) {
     return append(other);
 }
 
-inline String& String::operator+=(const char* cstr) {
+constexpr String& String::operator+=(const char* cstr) {
     return append(cstr);
 }
 
-inline String String::substr(const std::size_t pos, std::size_t len) const {
+constexpr String String::substr(const std::size_t pos, std::size_t len) const {
     if (pos > size_) {
         throw std::out_of_range("substr position out of bounds");
     }
@@ -252,14 +275,14 @@ inline String String::substr(const std::size_t pos, std::size_t len) const {
     return result;
 }
 
-inline std::size_t String::find(const char ch, const std::size_t pos) const {
+constexpr std::size_t String::find(const char ch, const std::size_t pos) const {
     for (std::size_t i = pos; i < size_; ++i) {
         if (data_[i] == ch) return i;
     }
     return npos;
 }
 
-inline std::size_t String::find(const String& str, const std::size_t pos) const {
+constexpr std::size_t String::find(const String& str, const std::size_t pos) const {
     if (str.size_ == 0) return pos <= size_ ? pos : npos;
     if (str.size_ > size_) return npos;
     for (std::size_t i = pos; i <= size_ - str.size_; ++i) {
@@ -268,29 +291,6 @@ inline std::size_t String::find(const String& str, const std::size_t pos) const 
         }
     }
     return npos;
-}
-
-inline char& String::operator[](const std::size_t index) {
-    if (index >= size_) throw std::out_of_range("Index out of bounds");
-    return data_[index];
-}
-
-inline const char& String::operator[](const std::size_t index) const {
-    if (index >= size_) throw std::out_of_range("Index out of bounds");
-    return data_[index];
-}
-
-inline bool String::operator==(const String& other) const {
-    if (size_ != other.size_) return false;
-    return std::memcmp(data_, other.data_, size_) == 0;
-}
-
-inline bool String::operator>(const String& other) const {
-    return std::strcmp(data_, other.data_) > 0;
-}
-
-inline bool String::operator<(const String& other) const {
-    return std::strcmp(data_, other.data_) < 0;
 }
 
 inline std::ostream& operator<<(std::ostream& out, const String& obj) {
@@ -321,7 +321,7 @@ inline std::istream& operator>>(std::istream& in, String& obj) {
 
 template <>
 struct std::hash<String> {
-    std::size_t operator()(const String& s) const noexcept {
+    constexpr std::size_t operator()(const String& s) const noexcept {
         std::size_t hash = 14695981039346656037ULL;
         const char* data = s.c_str();
         for (std::size_t i = 0; i < s.size(); ++i) {
@@ -332,4 +332,4 @@ struct std::hash<String> {
     }
 };
 
-#endif // CPP_STRING_H
+#endif // CPP_STRING_V26_H
