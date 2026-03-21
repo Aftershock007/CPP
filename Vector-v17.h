@@ -197,165 +197,10 @@ const U& Vector<U>::operator[](const std::size_t index) const {
     return data_[index];
 }
 
-// Strong exception guarantee: if copy throws, 'other' was never created.
-// Nothrow: swap itself is noexcept.
 template <typename U>
 Vector<U>& Vector<U>::operator=(Vector other) noexcept {
     other.swap(*this);
     return *this;
-}
-
-// Strong exception guarantee: if new throws, state is unchanged.
-// Uses std::move_if_noexcept for strong exception guarantee when relocating elements.
-template <typename U>
-void Vector<U>::reserve(const std::size_t new_cap) {
-    if (new_cap <= capacity_) {
-        return;
-    }
-    U* new_data = new U[new_cap];
-    if (data_ != nullptr) {
-        for (std::size_t i = 0; i < size_; ++i) {
-            new_data[i] = std::move_if_noexcept(data_[i]);
-        }
-    }
-    delete[] data_;
-    data_ = new_data;
-    capacity_ = new_cap;
-}
-
-// Strong exception guarantee: if reserve throws, state is unchanged.
-// Copies val before reserve to handle self-reference (e.g. vec.push_back(vec[0])).
-template <typename U>
-void Vector<U>::push_back(const U& val) {
-    if (size_ == capacity_) {
-        U copy = val;
-        reserve(capacity_ == 0 ? 1 : capacity_ * 2);
-        data_[size_++] = std::move(copy);
-    } else {
-        data_[size_++] = val;
-    }
-}
-
-// Strong exception guarantee. No self-reference risk with rvalues.
-template <typename U>
-void Vector<U>::push_back(U&& val) {
-    if (size_ == capacity_) {
-        reserve(capacity_ == 0 ? 1 : capacity_ * 2);
-    }
-    data_[size_++] = std::move(val);
-}
-
-// Strong exception guarantee.
-template <typename U>
-template <typename... Args>
-U& Vector<U>::emplace_back(Args&&... args) {
-    if (size_ == capacity_) {
-        reserve(capacity_ == 0 ? 1 : capacity_ * 2);
-    }
-    data_[size_] = U(std::forward<Args>(args)...);
-    return data_[size_++];
-}
-
-// Nothrow guarantee.
-template <typename U>
-void Vector<U>::pop_back() {
-    if (size_ > 0) {
-        --size_;
-        data_[size_] = U();
-    }
-}
-
-template <typename U>
-void Vector<U>::resize(const std::size_t count) {
-    if (count > capacity_) {
-        reserve(count);
-    }
-    // Value-initialize new elements if growing
-    for (std::size_t i = size_; i < count; ++i) {
-        data_[i] = U();
-    }
-    size_ = count;
-}
-
-template <typename U>
-void Vector<U>::resize(const std::size_t count, const U& val) {
-    if (count > capacity_) {
-        reserve(count);
-    }
-    // Fill new elements with val if growing
-    for (std::size_t i = size_; i < count; ++i) {
-        data_[i] = val;
-    }
-    size_ = count;
-}
-
-// Strong exception guarantee: allocate before delete.
-template <typename U>
-void Vector<U>::assign(const std::size_t count, const U& val) {
-    if (count > capacity_) {
-        U* new_data = new U[count];
-        delete[] data_;
-        data_ = new_data;
-        capacity_ = count;
-    }
-    size_ = count;
-    for (std::size_t i = 0; i < count; ++i) {
-        data_[i] = val;
-    }
-}
-
-// Basic exception guarantee. Invalidates iterators if reallocation occurs.
-template <typename U>
-U* Vector<U>::insert(const U* pos, const U& val) {
-    const std::size_t index = pos - data_;
-    if (index > size_) {
-        throw std::out_of_range("Insert position out of bounds");
-    }
-    if (size_ == capacity_) {
-        reserve(capacity_ == 0 ? 1 : capacity_ * 2);
-    }
-    // Shift elements right
-    for (std::size_t i = size_; i > index; --i) {
-        data_[i] = std::move(data_[i - 1]);
-    }
-    data_[index] = val;
-    ++size_;
-    return data_ + index;
-}
-
-// Basic exception guarantee. Invalidates iterators at and after pos.
-template <typename U>
-U* Vector<U>::erase(const U* pos) {
-    const std::size_t index = pos - data_;
-    if (index >= size_) {
-        throw std::out_of_range("Erase position out of bounds");
-    }
-    // Shift elements left
-    for (std::size_t i = index; i < size_ - 1; ++i) {
-        data_[i] = std::move(data_[i + 1]);
-    }
-    --size_;
-    data_[size_] = U();
-    return data_ + index;
-}
-
-// Strong exception guarantee: if new throws, state is unchanged.
-template <typename U>
-void Vector<U>::shrink_to_fit() {
-    if (capacity_ == size_) {
-        return;
-    }
-    if (size_ == 0) {
-        delete[] data_;
-        data_ = nullptr;
-        capacity_ = 0;
-        return;
-    }
-    U* new_data = new U[size_];
-    std::copy(data_, data_ + size_, new_data);
-    delete[] data_;
-    data_ = new_data;
-    capacity_ = size_;
 }
 
 // template <typename U>
@@ -391,7 +236,144 @@ void Vector<U>::shrink_to_fit() {
 //     return *this;
 // }
 
-// operator>> uses push_back — eliminates manual buffer management
+template <typename U>
+void Vector<U>::reserve(const std::size_t new_cap) {
+    if (new_cap <= capacity_) {
+        return;
+    }
+    U* new_data = new U[new_cap];
+    if (data_ != nullptr) {
+        for (std::size_t i = 0; i < size_; ++i) {
+            new_data[i] = std::move_if_noexcept(data_[i]);
+        }
+    }
+    delete[] data_;
+    data_ = new_data;
+    capacity_ = new_cap;
+}
+
+template <typename U>
+void Vector<U>::push_back(const U& val) {
+    if (size_ == capacity_) {
+        U copy = val;
+        reserve(capacity_ == 0 ? 1 : capacity_ * 2);
+        data_[size_++] = std::move(copy);
+    } else {
+        data_[size_++] = val;
+    }
+}
+
+template <typename U>
+void Vector<U>::push_back(U&& val) {
+    if (size_ == capacity_) {
+        reserve(capacity_ == 0 ? 1 : capacity_ * 2);
+    }
+    data_[size_++] = std::move(val);
+}
+
+template <typename U>
+template <typename... Args>
+U& Vector<U>::emplace_back(Args&&... args) {
+    if (size_ == capacity_) {
+        reserve(capacity_ == 0 ? 1 : capacity_ * 2);
+    }
+    data_[size_] = U(std::forward<Args>(args)...);
+    return data_[size_++];
+}
+
+template <typename U>
+void Vector<U>::pop_back() {
+    if (size_ > 0) {
+        --size_;
+        data_[size_] = U();
+    }
+}
+
+template <typename U>
+void Vector<U>::resize(const std::size_t count) {
+    if (count > capacity_) {
+        reserve(count);
+    }
+    for (std::size_t i = size_; i < count; ++i) {
+        data_[i] = U();
+    }
+    size_ = count;
+}
+
+template <typename U>
+void Vector<U>::resize(const std::size_t count, const U& val) {
+    if (count > capacity_) {
+        reserve(count);
+    }
+    for (std::size_t i = size_; i < count; ++i) {
+        data_[i] = val;
+    }
+    size_ = count;
+}
+
+template <typename U>
+void Vector<U>::assign(const std::size_t count, const U& val) {
+    if (count > capacity_) {
+        U* new_data = new U[count];
+        delete[] data_;
+        data_ = new_data;
+        capacity_ = count;
+    }
+    size_ = count;
+    for (std::size_t i = 0; i < count; ++i) {
+        data_[i] = val;
+    }
+}
+
+template <typename U>
+U* Vector<U>::insert(const U* pos, const U& val) {
+    const std::size_t index = pos - data_;
+    if (index > size_) {
+        throw std::out_of_range("Insert position out of bounds");
+    }
+    if (size_ == capacity_) {
+        reserve(capacity_ == 0 ? 1 : capacity_ * 2);
+    }
+    for (std::size_t i = size_; i > index; --i) {
+        data_[i] = std::move(data_[i - 1]);
+    }
+    data_[index] = val;
+    ++size_;
+    return data_ + index;
+}
+
+template <typename U>
+U* Vector<U>::erase(const U* pos) {
+    const std::size_t index = pos - data_;
+    if (index >= size_) {
+        throw std::out_of_range("Erase position out of bounds");
+    }
+    for (std::size_t i = index; i < size_ - 1; ++i) {
+        data_[i] = std::move(data_[i + 1]);
+    }
+    --size_;
+    data_[size_] = U();
+    return data_ + index;
+}
+
+template <typename U>
+void Vector<U>::shrink_to_fit() {
+    if (capacity_ == size_) {
+        return;
+    }
+    if (size_ == 0) {
+        delete[] data_;
+        data_ = nullptr;
+        capacity_ = 0;
+        return;
+    }
+    U* new_data = new U[size_];
+    std::copy(data_, data_ + size_, new_data);
+    delete[] data_;
+    data_ = new_data;
+    capacity_ = size_;
+}
+
 template <typename U>
 std::istream& operator>>(std::istream& in, Vector<U>& vector) {
     vector.clear();
