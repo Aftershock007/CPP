@@ -5,8 +5,8 @@
 #include <algorithm>
 #include <functional>
 #include <unordered_set>
-#include "String-v17.h"
-#include "Vector-v17.h"
+#include "String/String-v17.h"
+#include "Vector/Vector-v17.h"
 
 void test_string() {
     std::cout << "========== STRING TESTS ==========\n\n";

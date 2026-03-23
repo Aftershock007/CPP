@@ -1,0 +1,4 @@
+#ifndef CPP_SHAREDPTR_H
+#define CPP_SHAREDPTR_H
+
+#endif //CPP_SHAREDPTR_H

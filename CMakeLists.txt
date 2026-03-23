@@ -6,8 +6,10 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address,leak,undefined -g -fn
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address,leak,undefined")
 
 add_executable(CPP main.cpp
-        String-v26.h
-        String-v17.h
-        Vector-v26.h
-        Vector-v17.h
+        String/String-v26.h
+        String/String-v17.h
+        Vector/Vector-v26.h
+        Vector/Vector-v17.h
+        SmartPointer/Uniqueptr.h
+        SmartPointer/Sharedptr.h
 )
