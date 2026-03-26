@@ -7,6 +7,7 @@
 #include <unordered_set>
 #include "String/String-v17.h"
 #include "Vector/Vector-v17.h"
+#include "SmartPointer/Uniqueptr.h"
 
 void test_string() {
     std::cout << "========== STRING TESTS ==========\n\n";
@@ -572,8 +573,211 @@ void test_vector() {
     std::cout << "========== VECTOR TESTS DONE ==========\n\n";
 }
 
+void test_uniqueptr() {
+    std::cout << "========== UNIQUEPTR TESTS ==========\n\n";
+
+    std::cout << "--- U1. CONSTRUCTORS ---\n";
+    Uniqueptr<int> default_ptr;
+    std::cout << "Default: get() == nullptr (1): " << (default_ptr.get() == nullptr) << "\n";
+
+    Uniqueptr<int> nullptr_ptr(nullptr);
+    std::cout << "Nullptr: get() == nullptr (1): " << (nullptr_ptr.get() == nullptr) << "\n";
+
+    Uniqueptr<int> param_ptr(new int(42));
+    std::cout << "Param: *ptr == 42 (1): " << (*param_ptr == 42) << "\n";
+    std::cout << "get() != nullptr (1): " << (param_ptr.get() != nullptr) << "\n";
+
+    auto custom_deleter = [](const int* p) noexcept { delete p; };
+    Uniqueptr<int, decltype(custom_deleter)> custom_ptr(new int(99), custom_deleter);
+    std::cout << "Custom deleter: *ptr == 99 (1): " << (*custom_ptr == 99) << "\n\n";
+
+    std::cout << "--- U2. MOVE SEMANTICS ---\n";
+    Uniqueptr<int> move_src(new int(10));
+    int* raw = move_src.get();
+    Uniqueptr<int> move_dst(std::move(move_src));
+    std::cout << "Move ctor: *dst == 10 (1): " << (*move_dst == 10) << "\n";
+    std::cout << "Move ctor: dst.get() == old raw (1): " << (move_dst.get() == raw) << "\n";
+    std::cout << "Move ctor: src == nullptr (1): " << (move_src.get() == nullptr) << "\n";
+
+    Uniqueptr<int> move_assign_src(new int(20));
+    Uniqueptr<int> move_assign_dst;
+    raw = move_assign_src.get();
+    move_assign_dst = std::move(move_assign_src);
+    std::cout << "Move assign: *dst == 20 (1): " << (*move_assign_dst == 20) << "\n";
+    std::cout << "Move assign: src == nullptr (1): " << (move_assign_src.get() == nullptr) << "\n\n";
+
+    std::cout << "--- U3. OPERATOR* AND OPERATOR-> ---\n";
+    struct Point { int x; int y; };
+    Uniqueptr<Point> point_ptr(new Point{3, 4});
+    std::cout << "operator->: x == 3 (1): " << (point_ptr->x == 3) << "\n";
+    std::cout << "operator->: y == 4 (1): " << (point_ptr->y == 4) << "\n";
+    (*point_ptr).x = 10;
+    std::cout << "operator*: x after mutation == 10 (1): " << (point_ptr->x == 10) << "\n\n";
+
+    std::cout << "--- U4. OPERATOR BOOL ---\n";
+    Uniqueptr<int> bool_true(new int(1));
+    Uniqueptr<int> bool_false;
+    std::cout << "Non-null is true (1): " << static_cast<bool>(bool_true) << "\n";
+    std::cout << "Null is false (0): " << static_cast<bool>(bool_false) << "\n";
+    if (bool_true) {
+        std::cout << "if(ptr) works for non-null: yes\n";
+    }
+    if (!bool_false) {
+        std::cout << "if(!ptr) works for null: yes\n\n";
+    }
+
+    std::cout << "--- U5. RELEASE ---\n";
+    Uniqueptr<int> release_ptr(new int(55));
+    int* released = release_ptr.release();
+    std::cout << "Released value == 55 (1): " << (*released == 55) << "\n";
+    std::cout << "After release: ptr == nullptr (1): " << (release_ptr.get() == nullptr) << "\n";
+    std::cout << "After release: bool == false (0): " << static_cast<bool>(release_ptr) << "\n";
+    delete released;
+    std::cout << "\n";
+
+    std::cout << "--- U6. RESET ---\n";
+    Uniqueptr<int> reset_ptr(new int(100));
+    std::cout << "Before reset: *ptr == 100 (1): " << (*reset_ptr == 100) << "\n";
+    reset_ptr.reset(new int(200));
+    std::cout << "After reset(new): *ptr == 200 (1): " << (*reset_ptr == 200) << "\n";
+    reset_ptr.reset();
+    std::cout << "After reset(): ptr == nullptr (1): " << (reset_ptr.get() == nullptr) << "\n";
+    reset_ptr.reset(nullptr);
+    std::cout << "After reset(nullptr): still null (1): " << (reset_ptr.get() == nullptr) << "\n\n";
+
+    std::cout << "--- U7. SWAP ---\n";
+    Uniqueptr<int> swap_a(new int(1));
+    Uniqueptr<int> swap_b(new int(2));
+    int* a_raw = swap_a.get();
+    int* b_raw = swap_b.get();
+    swap_a.swap(swap_b);
+    std::cout << "After swap: a holds old b (1): " << (swap_a.get() == b_raw) << "\n";
+    std::cout << "After swap: b holds old a (1): " << (swap_b.get() == a_raw) << "\n";
+    std::cout << "*a == 2 (1): " << (*swap_a == 2) << "\n";
+    std::cout << "*b == 1 (1): " << (*swap_b == 1) << "\n";
+
+    Uniqueptr<int> swap_null;
+    swap_a.swap(swap_null);
+    std::cout << "Swap with null: a == nullptr (1): " << (swap_a.get() == nullptr) << "\n";
+    std::cout << "Swap with null: other == 2 (1): " << (*swap_null == 2) << "\n\n";
+
+    std::cout << "--- U8. COMPARISON OPERATORS ---\n";
+    Uniqueptr<int> cmp_null;
+    Uniqueptr<int> cmp_val(new int(5));
+    Uniqueptr<int> cmp_null2;
+    std::cout << "null == null (1): " << (cmp_null == cmp_null2) << "\n";
+    std::cout << "null != val (1): " << (cmp_null != cmp_val) << "\n";
+    std::cout << "ptr == nullptr (1): " << (cmp_null == nullptr) << "\n";
+    std::cout << "nullptr == ptr (1): " << (nullptr == cmp_null) << "\n";
+    std::cout << "val != nullptr (1): " << (cmp_val != nullptr) << "\n";
+    std::cout << "nullptr != val (1): " << (nullptr != cmp_val) << "\n\n";
+
+    std::cout << "--- U9. NULLPTR ASSIGNMENT ---\n";
+    Uniqueptr<int> null_assign(new int(77));
+    std::cout << "Before: *ptr == 77 (1): " << (*null_assign == 77) << "\n";
+    null_assign = nullptr;
+    std::cout << "After = nullptr: ptr == nullptr (1): " << (null_assign.get() == nullptr) << "\n\n";
+
+    std::cout << "--- U10. GET_DELETER ---\n";
+    Uniqueptr<int> del_ptr(new int(1));
+    DefaultDeleter<int>& del = del_ptr.get_deleter();
+    std::cout << "get_deleter() returned ref: yes\n";
+    const Uniqueptr<int> const_del_ptr(new int(2));
+    const DefaultDeleter<int>& cdel = const_del_ptr.get_deleter();
+    std::cout << "const get_deleter() returned ref: yes\n";
+    (void)del;
+    (void)cdel;
+    std::cout << "\n";
+
+    std::cout << "--- U11. MAKE_UNIQUE ---\n";
+    auto made = MakeUnique<int>(42);
+    std::cout << "MakeUnique<int>(42): *ptr == 42 (1): " << (*made == 42) << "\n";
+    auto made_str = MakeUnique<std::string>("hello");
+    std::cout << "MakeUnique<string>(\"hello\"): " << *made_str << "\n";
+    auto made_default = MakeUnique<int>();
+    std::cout << "MakeUnique<int>(): *ptr == 0 (1): " << (*made_default == 0) << "\n\n";
+
+    std::cout << "--- U12. ARRAY SPECIALIZATION ---\n";
+    Uniqueptr<int[]> arr_ptr(new int[5]{10, 20, 30, 40, 50});
+    std::cout << "arr[0] == 10 (1): " << (arr_ptr[0] == 10) << "\n";
+    std::cout << "arr[2] == 30 (1): " << (arr_ptr[2] == 30) << "\n";
+    std::cout << "arr[4] == 50 (1): " << (arr_ptr[4] == 50) << "\n";
+    arr_ptr[1] = 99;
+    std::cout << "After arr[1] = 99: arr[1] == 99 (1): " << (arr_ptr[1] == 99) << "\n";
+
+    const Uniqueptr<int[]> const_arr(new int[3]{7, 8, 9});
+    std::cout << "Const arr[0] == 7 (1): " << (const_arr[0] == 7) << "\n";
+
+    Uniqueptr<int[]> arr_move_src(new int[3]{1, 2, 3});
+    Uniqueptr<int[]> arr_move_dst(std::move(arr_move_src));
+    std::cout << "Array move: dst[0] == 1 (1): " << (arr_move_dst[0] == 1) << "\n";
+    std::cout << "Array move: src == nullptr (1): " << (arr_move_src.get() == nullptr) << "\n";
+
+    Uniqueptr<int[]> arr_assign_src(new int[2]{5, 6});
+    Uniqueptr<int[]> arr_assign_dst;
+    arr_assign_dst = std::move(arr_assign_src);
+    std::cout << "Array move assign: dst[1] == 6 (1): " << (arr_assign_dst[1] == 6) << "\n";
+    std::cout << "Array move assign: src == nullptr (1): " << (arr_assign_src.get() == nullptr) << "\n";
+
+    Uniqueptr<int[]> arr_release(new int[2]{11, 22});
+    int* arr_raw = arr_release.release();
+    std::cout << "Array release: arr_raw[0] == 11 (1): " << (arr_raw[0] == 11) << "\n";
+    std::cout << "Array release: ptr == nullptr (1): " << (arr_release.get() == nullptr) << "\n";
+    delete[] arr_raw;
+
+    Uniqueptr<int[]> arr_reset(new int[2]{33, 44});
+    arr_reset.reset(new int[3]{55, 66, 77});
+    std::cout << "Array reset: arr[0] == 55 (1): " << (arr_reset[0] == 55) << "\n";
+    arr_reset.reset();
+    std::cout << "Array reset(): ptr == nullptr (1): " << (arr_reset.get() == nullptr) << "\n\n";
+
+    std::cout << "--- U13. MAKE_UNIQUE_ARRAY ---\n";
+    auto arr_made = MakeUniqueArray<int>(5);
+    std::cout << "MakeUniqueArray<int>(5): all zero-initialized\n";
+    bool all_zero = true;
+    for (std::size_t i = 0; i < 5; ++i) {
+        if (arr_made[i] != 0) { all_zero = false; break; }
+    }
+    std::cout << "All zeros (1): " << all_zero << "\n";
+    arr_made[0] = 42;
+    std::cout << "After arr[0] = 42: arr[0] == 42 (1): " << (arr_made[0] == 42) << "\n\n";
+
+    std::cout << "--- U14. CONVERTING CONSTRUCTOR (Derived -> Base) ---\n";
+    struct Base { virtual ~Base() = default; int val = 10; };
+    struct Derived : Base { int extra = 20; };
+    Uniqueptr<Derived> derived_ptr(new Derived());
+    std::cout << "Derived: val == 10 (1): " << (derived_ptr->val == 10) << "\n";
+    std::cout << "Derived: extra == 20 (1): " << (derived_ptr->extra == 20) << "\n";
+    Uniqueptr<Base> base_ptr(std::move(derived_ptr));
+    std::cout << "After convert move: base->val == 10 (1): " << (base_ptr->val == 10) << "\n";
+    std::cout << "After convert move: derived == nullptr (1): " << (derived_ptr.get() == nullptr) << "\n\n";
+
+    std::cout << "--- U15. EDGE CASES ---\n";
+    Uniqueptr<int> empty_move_src;
+    Uniqueptr<int> empty_move_dst(std::move(empty_move_src));
+    std::cout << "Move from null: dst == nullptr (1): " << (empty_move_dst.get() == nullptr) << "\n";
+    std::cout << "Move from null: src == nullptr (1): " << (empty_move_src.get() == nullptr) << "\n";
+
+    Uniqueptr<int> empty_assign_src;
+    Uniqueptr<int> empty_assign_dst(new int(5));
+    empty_assign_dst = std::move(empty_assign_src);
+    std::cout << "Move assign from null: dst == nullptr (1): " << (empty_assign_dst.get() == nullptr) << "\n";
+
+    Uniqueptr<int> double_reset(new int(1));
+    double_reset.reset();
+    double_reset.reset();
+    std::cout << "Double reset on null: ok (1): " << (double_reset.get() == nullptr) << "\n";
+
+    Uniqueptr<int> release_null;
+    int* null_released = release_null.release();
+    std::cout << "Release on null: returns nullptr (1): " << (null_released == nullptr) << "\n\n";
+
+    std::cout << "========== UNIQUEPTR TESTS DONE ==========\n\n";
+}
+
 int main() {
     test_string();
     test_vector();
+    test_uniqueptr();
     return 0;
 }
